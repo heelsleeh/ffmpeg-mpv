@@ -356,7 +356,8 @@ static enum AVPixelFormat get_format(HEVCContext *s, const HEVCSPS *sps)
                      CONFIG_HEVC_D3D11VA_HWACCEL * 2 + \
                      CONFIG_HEVC_VAAPI_HWACCEL + \
                      CONFIG_HEVC_VIDEOTOOLBOX_HWACCEL + \
-                     CONFIG_HEVC_VDPAU_HWACCEL)
+                     CONFIG_HEVC_VDPAU_HWACCEL + \
+                     CONFIG_HEVC_CUVID_HWACCEL)
     enum AVPixelFormat pix_fmts[HWACCEL_MAX + 2], *fmt = pix_fmts;
 
     switch (sps->pix_fmt) {
@@ -375,6 +376,9 @@ static enum AVPixelFormat get_format(HEVCContext *s, const HEVCSPS *sps)
 #if CONFIG_HEVC_VDPAU_HWACCEL
         *fmt++ = AV_PIX_FMT_VDPAU;
 #endif
+#if CONFIG_HEVC_CUVID_HWACCEL
+        *fmt++ = AV_PIX_FMT_CUDA;
+#endif
 #if CONFIG_HEVC_VIDEOTOOLBOX_HWACCEL
         *fmt++ = AV_PIX_FMT_VIDEOTOOLBOX;
 #endif
@@ -392,6 +396,9 @@ static enum AVPixelFormat get_format(HEVCContext *s, const HEVCSPS *sps)
 #endif
 #if CONFIG_HEVC_VIDEOTOOLBOX_HWACCEL
         *fmt++ = AV_PIX_FMT_VIDEOTOOLBOX;
+#endif
+#if CONFIG_HEVC_CUVID_HWACCEL
+        *fmt++ = AV_PIX_FMT_CUDA;
 #endif
         break;
     }
