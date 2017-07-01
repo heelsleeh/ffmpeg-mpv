@@ -36,6 +36,7 @@
 #include "libavutil/imgutils.h"
 
 #include "avcodec.h"
+#include "decode.h"
 #include "get_bits.h"
 #include "hpeldsp.h"
 #include "internal.h"
@@ -1457,7 +1458,7 @@ static void vp3_draw_horiz_band(Vp3DecodeContext *s, int y)
         offset[i] = 0;
 
     emms_c();
-    s->avctx->draw_horiz_band(s->avctx, s->current_frame.f, offset, y, 3, h);
+    ff_call_draw_horiz_band(s->avctx, s->current_frame.f, offset, y, 3, h);
 }
 
 /**
