@@ -3541,6 +3541,11 @@ typedef struct AVHWAccel {
      * that avctx->hwaccel_priv_data is invalid.
      */
     int (*frame_params)(AVCodecContext *avctx, AVBufferRef *hw_frames_ctx);
+
+    /**
+     * Some hwaccels are ambiguous if only
+     */
+    const AVClass *decoder_class;
 } AVHWAccel;
 
 /**
