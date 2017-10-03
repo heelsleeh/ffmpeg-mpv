@@ -1201,7 +1201,7 @@ static int setup_hwaccel(AVCodecContext *avctx,
 
     if (!hwa) {
         av_log(avctx, AV_LOG_ERROR,
-               "Could not find an AVHWAccel for the pixel format: %s",
+               "Could not find an AVHWAccel for the pixel format: %s\n",
                name);
         return AVERROR(ENOENT);
     }
