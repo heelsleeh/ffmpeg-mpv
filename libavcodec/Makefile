@@ -1,7 +1,8 @@
 NAME = avcodec
 DESC = FFmpeg codec library
 
-HEADERS = avcodec.h                                                     \
+HEADERS = ac3_parser.h                                                  \
+          avcodec.h                                                     \
           avdct.h                                                       \
           avfft.h                                                       \
           d3d11va.h                                                     \
@@ -18,7 +19,8 @@ HEADERS = avcodec.h                                                     \
           vorbis_parser.h                                               \
           xvmc.h                                                        \
 
-OBJS = allcodecs.o                                                      \
+OBJS = ac3_parser.o                                                     \
+       allcodecs.o                                                      \
        avdct.o                                                          \
        avpacket.o                                                       \
        avpicture.o                                                      \
@@ -395,6 +397,7 @@ OBJS-$(CONFIG_M101_DECODER)            += m101.o
 OBJS-$(CONFIG_MACE3_DECODER)           += mace.o
 OBJS-$(CONFIG_MACE6_DECODER)           += mace.o
 OBJS-$(CONFIG_MAGICYUV_DECODER)        += magicyuv.o
+OBJS-$(CONFIG_MAGICYUV_ENCODER)        += magicyuvenc.o
 OBJS-$(CONFIG_MDEC_DECODER)            += mdec.o mpeg12.o mpeg12data.o
 OBJS-$(CONFIG_METASOUND_DECODER)       += metasound.o metasound_data.o \
                                           twinvq.o
@@ -955,8 +958,7 @@ OBJS-$(CONFIG_LIBZVBI_TELETEXT_DECODER)   += libzvbi-teletextdec.o ass.o
 OBJS-$(CONFIG_AAC_LATM_PARSER)         += latm_parser.o
 OBJS-$(CONFIG_AAC_PARSER)              += aac_parser.o aac_ac3_parser.o \
                                           aacadtsdec.o mpeg4audio.o
-OBJS-$(CONFIG_AC3_PARSER)              += ac3_parser.o ac3tab.o \
-                                          aac_ac3_parser.o
+OBJS-$(CONFIG_AC3_PARSER)              += ac3tab.o aac_ac3_parser.o
 OBJS-$(CONFIG_ADX_PARSER)              += adx_parser.o adx.o
 OBJS-$(CONFIG_BMP_PARSER)              += bmp_parser.o
 OBJS-$(CONFIG_CAVSVIDEO_PARSER)        += cavs_parser.o
