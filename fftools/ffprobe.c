@@ -2792,7 +2792,7 @@ static int show_format(WriterContext *w, InputFile *ifile)
     else           print_str_opt("size", "N/A");
     if (fmt_ctx->bit_rate > 0) print_val    ("bit_rate", fmt_ctx->bit_rate, unit_bit_per_second_str);
     else                       print_str_opt("bit_rate", "N/A");
-    print_int("probe_score", av_format_get_probe_score(fmt_ctx));
+    print_int("probe_score", fmt_ctx->probe_score);
     if (do_show_format_tags)
         ret = show_tags(w, fmt_ctx->metadata, SECTION_ID_FORMAT_TAGS);
 
@@ -2827,8 +2827,6 @@ static int open_input_file(InputFile *ifile, const char *filename)
         print_error(filename, AVERROR(ENOMEM));
         exit_program(1);
     }
-
-    fmt_ctx->flags |= AVFMT_FLAG_KEEP_SIDE_DATA;
 
     if (!av_dict_get(format_opts, "scan_all_pmts", NULL, AV_DICT_MATCH_CASE)) {
         av_dict_set(&format_opts, "scan_all_pmts", "1", AV_DICT_DONT_OVERWRITE);

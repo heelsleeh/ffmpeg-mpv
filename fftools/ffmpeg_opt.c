@@ -995,7 +995,6 @@ static int open_input_file(OptionsContext *o, const char *filename)
         print_error(filename, AVERROR(ENOMEM));
         exit_program(1);
     }
-    ic->flags |= AVFMT_FLAG_KEEP_SIDE_DATA;
     if (o->nb_audio_sample_rate) {
         av_dict_set_int(&o->g->format_opts, "sample_rate", o->audio_sample_rate[o->nb_audio_sample_rate - 1].u.i, 0);
     }
@@ -1030,23 +1029,19 @@ static int open_input_file(OptionsContext *o, const char *filename)
     MATCH_PER_TYPE_OPT(codec_names, str, subtitle_codec_name, ic, "s");
     MATCH_PER_TYPE_OPT(codec_names, str,     data_codec_name, ic, "d");
 
-    ic->video_codec_id   = video_codec_name ?
-        find_codec_or_die(video_codec_name   , AVMEDIA_TYPE_VIDEO   , 0)->id : AV_CODEC_ID_NONE;
-    ic->audio_codec_id   = audio_codec_name ?
-        find_codec_or_die(audio_codec_name   , AVMEDIA_TYPE_AUDIO   , 0)->id : AV_CODEC_ID_NONE;
-    ic->subtitle_codec_id= subtitle_codec_name ?
-        find_codec_or_die(subtitle_codec_name, AVMEDIA_TYPE_SUBTITLE, 0)->id : AV_CODEC_ID_NONE;
-    ic->data_codec_id    = data_codec_name ?
-        find_codec_or_die(data_codec_name, AVMEDIA_TYPE_DATA, 0)->id : AV_CODEC_ID_NONE;
-
     if (video_codec_name)
-        av_format_set_video_codec   (ic, find_codec_or_die(video_codec_name   , AVMEDIA_TYPE_VIDEO   , 0));
+        ic->video_codec    = find_codec_or_die(video_codec_name   , AVMEDIA_TYPE_VIDEO   , 0);
     if (audio_codec_name)
-        av_format_set_audio_codec   (ic, find_codec_or_die(audio_codec_name   , AVMEDIA_TYPE_AUDIO   , 0));
+        ic->audio_codec    = find_codec_or_die(audio_codec_name   , AVMEDIA_TYPE_AUDIO   , 0);
     if (subtitle_codec_name)
-        av_format_set_subtitle_codec(ic, find_codec_or_die(subtitle_codec_name, AVMEDIA_TYPE_SUBTITLE, 0));
+        ic->subtitle_codec = find_codec_or_die(subtitle_codec_name, AVMEDIA_TYPE_SUBTITLE, 0);
     if (data_codec_name)
-        av_format_set_data_codec(ic, find_codec_or_die(data_codec_name, AVMEDIA_TYPE_DATA, 0));
+        ic->data_codec     = find_codec_or_die(data_codec_name    , AVMEDIA_TYPE_DATA    , 0);
+
+    ic->video_codec_id     = video_codec_name    ? ic->video_codec->id    : AV_CODEC_ID_NONE;
+    ic->audio_codec_id     = audio_codec_name    ? ic->audio_codec->id    : AV_CODEC_ID_NONE;
+    ic->subtitle_codec_id  = subtitle_codec_name ? ic->subtitle_codec->id : AV_CODEC_ID_NONE;
+    ic->data_codec_id      = data_codec_name     ? ic->data_codec->id     : AV_CODEC_ID_NONE;
 
     ic->flags |= AVFMT_FLAG_NONBLOCK;
     if (o->bitexact)
@@ -1993,7 +1988,6 @@ static int read_ffserver_streams(OptionsContext *o, AVFormatContext *s, const ch
     int i, err;
     AVFormatContext *ic = avformat_alloc_context();
 
-    ic->flags |= AVFMT_FLAG_KEEP_SIDE_DATA;
     ic->interrupt_callback = int_cb;
     err = avformat_open_input(&ic, filename, NULL, NULL);
     if (err < 0)
