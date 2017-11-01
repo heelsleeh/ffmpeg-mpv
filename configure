@@ -541,7 +541,7 @@ filter(){
     pat=$1
     shift
     for v; do
-        eval "case $v in $pat) printf '%s ' $v ;; esac"
+        eval "case '$v' in $pat) printf '%s ' '$v' ;; esac"
     done
 }
 
@@ -549,7 +549,7 @@ filter_out(){
     pat=$1
     shift
     for v; do
-        eval "case $v in $pat) ;; *) printf '%s ' $v ;; esac"
+        eval "case '$v' in $pat) ;; *) printf '%s ' '$v' ;; esac"
     done
 }
 
@@ -2054,7 +2054,7 @@ SYSTEM_FUNCS="
 "
 
 TOOLCHAIN_FEATURES="
-    as_dn_directive
+    as_arch_directive
     as_fpu_directive
     as_func
     as_object_arch
@@ -2137,6 +2137,7 @@ HAVE_LIST="
 CONFIG_EXTRA="
     aandcttables
     ac3dsp
+    adts_header
     audio_frame_queue
     audiodsp
     blockdsp
@@ -2423,7 +2424,7 @@ vc1dsp_select="h264chroma qpeldsp startcode"
 rdft_select="fft"
 
 # decoders / encoders
-aac_decoder_select="mdct15 mdct sinewin"
+aac_decoder_select="adts_header mdct15 mdct sinewin"
 aac_fixed_decoder_select="mdct sinewin"
 aac_encoder_select="audio_frame_queue iirfilter lpc mdct sinewin"
 aac_latm_decoder_select="aac_decoder aac_latm_parser"
@@ -2879,6 +2880,7 @@ vp9_v4l2m2m_decoder_deps="v4l2_m2m vp9_v4l2_m2m"
 wmv3_crystalhd_decoder_select="crystalhd"
 
 # parsers
+aac_parser_select="adts_header"
 h264_parser_select="golomb h264dsp h264parse"
 hevc_parser_select="hevcparse"
 mpegaudio_parser_select="mpegaudioheader"
@@ -2887,6 +2889,7 @@ mpeg4video_parser_select="h263dsp mpegvideo qpeldsp"
 vc1_parser_select="vc1dsp"
 
 # bitstream_filters
+aac_adtstoasc_bsf_select="adts_header"
 h264_metadata_bsf_select="cbs_h264"
 h264_redundant_pps_bsf_select="cbs_h264"
 hevc_metadata_bsf_select="cbs_h265"
@@ -3053,7 +3056,8 @@ sap_demuxer_select="sdp_demuxer"
 sap_muxer_select="rtp_muxer rtp_protocol rtpenc_chain"
 sdp_demuxer_select="rtpdec"
 smoothstreaming_muxer_select="ismv_muxer"
-spdif_muxer_select="aac_parser"
+spdif_demuxer_select="adts_header"
+spdif_muxer_select="adts_header"
 spx_muxer_select="ogg_muxer"
 swf_demuxer_suggest="zlib"
 tak_demuxer_select="tak_parser"
@@ -5525,9 +5529,8 @@ EOF
 
     check_inline_asm asm_mod_q '"add r0, %Q0, %R0" :: "r"((long long)0)'
 
-    check_as <<EOF && enable as_dn_directive
-ra .dn d0.i16
-.unreq ra
+    check_as <<EOF && enable as_arch_directive
+.arch armv7-a
 EOF
     check_as <<EOF && enable as_fpu_directive
 .fpu neon
@@ -5608,7 +5611,14 @@ EOF
 
     if enabled vsx; then
         check_cflags -mvsx &&
-        check_builtin vec_vsx_ld "altivec.h" "__builtin_vec_vsx_ld" || disable vsx
+        check_cc <<EOF || disable vsx
+$inc_altivec_h
+int main(void) {
+    int v[4] = { 0 };
+    vector signed int v1 = vec_vsx_ld(0, v);
+    return 0;
+}
+EOF
     fi
 
     if enabled power8; then
