@@ -366,7 +366,7 @@ Toolchain options:
   --extra-objcflags=FLAGS  add FLAGS to OBJCFLAGS [$CFLAGS]
   --extra-ldflags=ELDFLAGS add ELDFLAGS to LDFLAGS [$LDFLAGS]
   --extra-ldexeflags=ELDFLAGS add ELDFLAGS to LDEXEFLAGS [$LDEXEFLAGS]
-  --extra-ldlibflags=ELDFLAGS add ELDFLAGS to LDLIBFLAGS [$LDLIBFLAGS]
+  --extra-ldsoflags=ELDFLAGS add ELDFLAGS to LDSOFLAGS [$LDSOFLAGS]
   --extra-libs=ELIBS       add ELIBS [$ELIBS]
   --extra-version=STRING   version string suffix []
   --optflags=OPTFLAGS      override optimization-related compiler flags
@@ -870,8 +870,8 @@ add_ldexeflags(){
     append LDEXEFLAGS $($ldflags_filter "$@")
 }
 
-add_ldlibflags(){
-    append LDLIBFLAGS $($ldflags_filter "$@")
+add_ldsoflags(){
+    append LDSOFLAGS $($ldflags_filter "$@")
 }
 
 add_stripflags(){
@@ -1570,6 +1570,7 @@ EXTERNAL_LIBRARY_VERSION3_LIST="
     gmp
     libopencore_amrnb
     libopencore_amrwb
+    libvmaf
     libvo_amrwbenc
     rkmpp
 "
@@ -1626,7 +1627,6 @@ EXTERNAL_LIBRARY_LIST="
     libtheora
     libtwolame
     libv4l2
-    libvmaf
     libvorbis
     libvpx
     libwavpack
@@ -2827,6 +2827,8 @@ hevc_vaapi_encoder_select="cbs_h265 vaapi_encode"
 hevc_v4l2m2m_decoder_deps="v4l2_m2m hevc_v4l2_m2m"
 hevc_v4l2m2m_encoder_deps="v4l2_m2m hevc_v4l2_m2m"
 mjpeg_cuvid_decoder_deps="cuda cuvid"
+mjpeg_qsv_encoder_deps="libmfx"
+mjpeg_qsv_encoder_select="qsvenc"
 mjpeg_vaapi_encoder_deps="VAEncPictureParameterBufferJPEG"
 mjpeg_vaapi_encoder_select="vaapi_encode jpegtables"
 mpeg1_cuvid_decoder_deps="cuda cuvid"
@@ -3317,7 +3319,7 @@ avformat_deps="avcodec avutil"
 avformat_suggest="libm network zlib"
 avresample_deps="avutil"
 avresample_suggest="libm"
-avutil_suggest="clock_gettime libm libdrm libmfx opencl user32 vaapi videotoolbox corefoundation corevideo coremedia wincrypt"
+avutil_suggest="clock_gettime cuda libm libdrm libmfx opencl user32 vaapi videotoolbox corefoundation corevideo coremedia wincrypt"
 postproc_deps="avutil gpl"
 postproc_suggest="libm"
 swresample_deps="avutil"
@@ -3327,7 +3329,7 @@ swscale_suggest="libm"
 
 avcodec_extralibs="pthreads_extralibs iconv_extralibs"
 avfilter_extralibs="pthreads_extralibs"
-avutil_extralibs="nanosleep_extralibs pthreads_extralibs vaapi_drm_extralibs vaapi_x11_extralibs vdpau_x11_extralibs"
+avutil_extralibs="d3d11va_extralibs nanosleep_extralibs pthreads_extralibs vaapi_drm_extralibs vaapi_x11_extralibs vdpau_x11_extralibs"
 
 # programs
 ffmpeg_deps="avcodec avfilter avformat swresample"
@@ -3610,8 +3612,13 @@ for opt do
         --extra-ldexeflags=*)
             add_ldexeflags $optval
         ;;
+        --extra-ldsoflags=*)
+            add_ldsoflags $optval
+        ;;
         --extra-ldlibflags=*)
-            add_ldlibflags $optval
+            warn "The --extra-ldlibflags option is only provided for compatibility and will be\n"\
+                 "removed in the future. Use --extra-ldsoflags instead."
+            add_ldsoflags $optval
         ;;
         --extra-libs=*)
             add_extralibs $optval
@@ -4461,9 +4468,6 @@ if test -n "$sysroot"; then
         gcc|llvm_gcc|clang)
             add_cppflags --sysroot="$sysroot"
             add_ldflags --sysroot="$sysroot"
-# On Darwin --sysroot may be ignored, -isysroot always affects headers and linking
-            add_cppflags -isysroot "$sysroot"
-            add_ldflags -isysroot "$sysroot"
         ;;
         tms470)
             add_cppflags -I"$sysinclude"
@@ -5018,6 +5022,10 @@ case $target_os in
             { check_cflags -mdynamic-no-pic && add_asflags -mdynamic-no-pic; }
         check_header dispatch/dispatch.h &&
             add_cppflags '-I\$(SRC_PATH)/compat/dispatch_semaphore'
+        if test -n "$sysroot"; then
+            is_in -isysroot $cc $CPPFLAGS $CFLAGS || check_cppflags -isysroot $sysroot
+            is_in -isysroot $ld $LDFLAGS          || check_ldflags  -isysroot $sysroot
+        fi
         version_script='-exported_symbols_list'
         VERSION_SCRIPT_POSTPROCESS_CMD='tr " " "\n" | sed -n /global:/,/local:/p | grep ";" | tr ";" "\n" | sed -E "s/(.+)/_\1/g" | sed -E "s/(.+[^*])$$$$/\1*/"'
         ;;
@@ -5637,10 +5645,14 @@ EOF
             x86asmexe=$x86asmexe_probe
             x86asm_type=nasm
             x86asm_debug="-g -F dwarf"
+            X86ASMDEP=
+            X86ASM_DEPFLAGS='-MD $(@:.o=.d)'
         elif check_cmd $x86asmexe_probe --version; then
             x86asmexe=$x86asmexe_probe
             x86asm_type=yasm
             x86asm_debug="-g dwarf2"
+            X86ASMDEP='$(DEPX86ASM) $(X86ASMFLAGS) -M $(X86ASM_O) $< > $(@:.o=.d)'
+            X86ASM_DEPFLAGS=
         fi
         check_x86asm "movbe ecx, [5]" && enable x86asm
     }
@@ -5651,8 +5663,6 @@ EOF
             probe_x86asm $program && break
         done
         disabled x86asm && die "nasm/yasm not found or too old. Use --disable-x86asm for a crippled build."
-        test $x86asm_type = 'nasm' && X86ASM_DEPFLAGS='-MD $(@:.o=.d)'
-        test $x86asm_type = 'yasm' && X86ASMDEP='$(DEPX86ASM) $(X86ASMFLAGS) -M $(X86ASM_O) $< > $(@:.o=.d)'
         X86ASMFLAGS="-f $objformat"
         enabled pic               && append X86ASMFLAGS "-DPIC"
         test -n "$extern_prefix"  && append X86ASMFLAGS "-DPREFIX"
@@ -5820,6 +5830,7 @@ check_header asm/types.h
 # so we also check that atomics actually work here
 check_builtin stdatomic_h stdatomic.h "atomic_int foo, bar = ATOMIC_VAR_INIT(-1); atomic_store(&foo, 0)"
 
+check_lib advapi32 "windows.h"            RegCloseKey          -ladvapi32
 check_lib ole32    "windows.h"            CoTaskMemFree        -lole32
 check_lib shell32  "windows.h shellapi.h" CommandLineToArgvW   -lshell32
 check_lib wincrypt "windows.h wincrypt.h" CryptGenRandom       -ladvapi32
@@ -5979,7 +5990,7 @@ enabled libkvazaar        && require_pkg_config libkvazaar "kvazaar >= 0.8.1" kv
 # pkg-config support.  Instead, users should make sure that the build
 # can find the libraries and headers through other means.
 enabled libmfx            && { use_pkg_config libmfx libmfx "mfx/mfxvideo.h" MFXInit ||
-                               { require libmfx "mfx/mfxvideo.h" MFXInit -llibmfx && warn "using libmfx without pkg-config"; } }
+                               { require libmfx "mfx/mfxvideo.h" MFXInit "-llibmfx $advapi32_extralibs" && warn "using libmfx without pkg-config"; } }
 enabled libmodplug        && require_pkg_config libmodplug libmodplug libmodplug/modplug.h ModPlug_Load
 enabled libmp3lame        && require "libmp3lame >= 3.98.3" lame/lame.h lame_set_VBR_quality -lmp3lame
 enabled libmysofa         && require libmysofa "mysofa.h" mysofa_load -lmysofa $zlib_extralibs
@@ -6368,8 +6379,7 @@ EOF
 # add some linker flags
 check_ldflags -Wl,--warn-common
 check_ldflags -Wl,-rpath-link=libpostproc:libswresample:libswscale:libavfilter:libavdevice:libavformat:libavcodec:libavutil:libavresample
-enabled rpath && add_ldexeflags -Wl,-rpath,$libdir
-enabled rpath && add_ldlibflags -Wl,-rpath,$libdir
+enabled rpath && add_ldexeflags -Wl,-rpath,$libdir && add_ldsoflags -Wl,-rpath,$libdir
 test_ldflags -Wl,-Bsymbolic && append SHFLAGS -Wl,-Bsymbolic
 
 # add some strip flags
@@ -6961,7 +6971,7 @@ DEPWINDRES=$dep_cc
 DOXYGEN=$doxygen
 LDFLAGS=$LDFLAGS
 LDEXEFLAGS=$LDEXEFLAGS
-LDLIBFLAGS=$LDLIBFLAGS
+LDSOFLAGS=$LDSOFLAGS
 SHFLAGS=$(echo $($ldflags_filter $SHFLAGS))
 ASMSTRIPFLAGS=$ASMSTRIPFLAGS
 X86ASMFLAGS=$X86ASMFLAGS
