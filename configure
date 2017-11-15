@@ -307,7 +307,6 @@ External library support:
   --disable-cuda           disable dynamically linked Nvidia CUDA code [autodetect]
   --enable-cuda-sdk        enable CUDA features that require the CUDA SDK [no]
   --disable-cuvid          disable Nvidia CUVID support [autodetect]
-  --disable-cuvid-hwaccel  Nvidia CUVID video decode acceleration (via hwaccel) [autodetect]
   --disable-d3d11va        disable Microsoft Direct3D 11 video acceleration code [autodetect]
   --disable-dxva2          disable Microsoft DirectX 9 video acceleration code [autodetect]
   --enable-libdrm          enable DRM code (Linux) [no]
@@ -1646,7 +1645,6 @@ HWACCEL_AUTODETECT_LIBRARY_LIST="
     crystalhd
     cuda
     cuvid
-    cuvid_hwaccel
     d3d11va
     dxva2
     nvenc
@@ -2666,8 +2664,6 @@ h263_videotoolbox_hwaccel_deps="videotoolbox"
 h263_videotoolbox_hwaccel_select="h263_decoder"
 h264_cuvid_hwaccel_deps="cuda cuvid"
 h264_cuvid_hwaccel_select="h264_cuvid_decoder"
-h264_cuvid_hwaccel_hwaccel_deps="cuda cuvid_hwaccel"
-h264_cuvid_hwaccel_hwaccel_select="h264_decoder"
 h264_d3d11va_hwaccel_deps="d3d11va"
 h264_d3d11va_hwaccel_select="h264_decoder"
 h264_d3d11va2_hwaccel_deps="d3d11va"
@@ -5944,8 +5940,6 @@ done
 enabled cuda_sdk          && require cuda_sdk cuda.h cuCtxCreate -lcuda
 enabled cuvid             && { enabled cuda ||
                                die "ERROR: CUVID requires CUDA"; }
-enabled cuvid_hwaccel     && { enabled cuda ||
-                               die "ERROR: CUVID hwaccel requires CUDA"; }
 enabled chromaprint       && require chromaprint chromaprint.h chromaprint_get_version -lchromaprint
 enabled decklink          && { require_header DeckLinkAPI.h &&
                                { check_cpp_condition DeckLinkAPIVersion.h "BLACKMAGIC_DECKLINK_API_VERSION >= 0x0a060100" || die "ERROR: Decklink API version must be >= 10.6.1."; } }
@@ -6301,11 +6295,11 @@ if enabled x86; then
         mingw32*|mingw64*|win32|win64|linux|cygwin*)
             ;;
         *)
-            disable cuda cuvid cuvid_hwaccel nvenc
+            disable cuda cuvid nvenc
             ;;
     esac
 else
-    disable cuda cuvid cuvid_hwaccel nvenc
+    disable cuda cuvid nvenc
 fi
 
 enabled nvenc &&

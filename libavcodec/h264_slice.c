@@ -759,8 +759,7 @@ static enum AVPixelFormat get_pixel_format(H264Context *h, int force_callback)
                      (CONFIG_H264_D3D11VA_HWACCEL * 2) + \
                      CONFIG_H264_VAAPI_HWACCEL + \
                      CONFIG_H264_VIDEOTOOLBOX_HWACCEL + \
-                     CONFIG_H264_VDPAU_HWACCEL + \
-                     CONFIG_H264_CUVID_HWACCEL)
+                     CONFIG_H264_VDPAU_HWACCEL)
     enum AVPixelFormat pix_fmts[HWACCEL_MAX + 2], *fmt = pix_fmts;
     const enum AVPixelFormat *choices = pix_fmts;
     int i;
@@ -813,9 +812,6 @@ static enum AVPixelFormat get_pixel_format(H264Context *h, int force_callback)
     case 8:
 #if CONFIG_H264_VDPAU_HWACCEL
         *fmt++ = AV_PIX_FMT_VDPAU;
-#endif
-#if CONFIG_H264_CUVID_HWACCEL
-        *fmt++ = AV_PIX_FMT_CUDA;
 #endif
         if (CHROMA444(h)) {
             if (h->avctx->colorspace == AVCOL_SPC_RGB)

@@ -3543,9 +3543,7 @@ typedef struct AVHWAccel {
     int (*frame_params)(AVCodecContext *avctx, AVBufferRef *hw_frames_ctx);
 
     /**
-     * Some hwaccels are ambiguous if only the id and pix_fmt fields are used.
-     * If non-NULL, the associated AVCodec must have
-     * FF_CODEC_CAP_HWACCEL_REQUIRE_CLASS set.
+     * Some hwaccels are ambiguous if only
      */
     const AVClass *decoder_class;
 } AVHWAccel;
