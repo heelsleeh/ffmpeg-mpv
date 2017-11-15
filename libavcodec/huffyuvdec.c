@@ -33,7 +33,6 @@
 #define UNCHECKED_BITSTREAM_READER 1
 
 #include "avcodec.h"
-#include "decode.h"
 #include "get_bits.h"
 #include "huffyuv.h"
 #include "huffyuvdsp.h"
@@ -875,7 +874,7 @@ static void draw_slice(HYuvContext *s, AVFrame *frame, int y)
         offset[i] = 0;
     emms_c();
 
-    ff_call_draw_horiz_band(s->avctx, frame, offset, y, 3, h);
+    s->avctx->draw_horiz_band(s->avctx, frame, offset, y, 3, h);
 
     s->last_slice_end = y + h;
 }

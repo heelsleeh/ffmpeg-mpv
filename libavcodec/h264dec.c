@@ -39,7 +39,6 @@
 #include "cabac_functions.h"
 #include "error_resilience.h"
 #include "avcodec.h"
-#include "decode.h"
 #include "h264.h"
 #include "h264dec.h"
 #include "h2645_parse.h"
@@ -130,8 +129,8 @@ void ff_h264_draw_horiz_band(const H264Context *h, H264SliceContext *sl,
 
         emms_c();
 
-        ff_call_draw_horiz_band(avctx, src, offset,
-                                y, h->picture_structure, height);
+        avctx->draw_horiz_band(avctx, src, offset,
+                               y, h->picture_structure, height);
     }
 }
 

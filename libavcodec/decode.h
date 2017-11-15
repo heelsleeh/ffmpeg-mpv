@@ -28,17 +28,6 @@
 #include "avcodec.h"
 
 /**
- * This struct stores per-frame lavc-internal data and is attached to it via
- * opaque_ref.
- */
-typedef struct FrameDecodeData {
-    /**
-     * The original user-set opaque_ref.
-     */
-    AVBufferRef *user_opaque_ref;
-} FrameDecodeData;
-
-/**
  * Called by decoders to get the next packet for decoding.
  *
  * @param pkt An empty packet to be filled with data.
@@ -58,11 +47,5 @@ void ff_decode_bsfs_uninit(AVCodecContext *avctx);
  */
 int ff_decode_get_hw_frames_ctx(AVCodecContext *avctx,
                                 enum AVHWDeviceType dev_type);
-
-void ff_call_draw_horiz_band(struct AVCodecContext *s,
-                             const AVFrame *src, int offset[AV_NUM_DATA_POINTERS],
-                             int y, int type, int height);
-
-int ff_attach_decode_data(AVFrame *frame);
 
 #endif /* AVCODEC_DECODE_H */

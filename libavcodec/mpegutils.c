@@ -25,7 +25,6 @@
 #include "libavutil/pixdesc.h"
 
 #include "avcodec.h"
-#include "decode.h"
 #include "mpegutils.h"
 
 void ff_draw_horiz_band(AVCodecContext *avctx,
@@ -75,6 +74,7 @@ void ff_draw_horiz_band(AVCodecContext *avctx,
 
         emms_c();
 
-        ff_call_draw_horiz_band(avctx, src, offset, y, picture_structure, h);
+        avctx->draw_horiz_band(avctx, src, offset,
+                               y, picture_structure, h);
     }
 }

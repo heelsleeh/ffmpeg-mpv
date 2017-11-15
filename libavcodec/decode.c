@@ -613,26 +613,6 @@ static int decode_receive_frame_internal(AVCodecContext *avctx, AVFrame *frame)
     if (ret == AVERROR_EOF)
         avci->draining_done = 1;
 
-    /* unwrap the per-frame decode data and restore the original opaque_ref*/
-    if (!ret) {
-        /* the only case where decode data is not set should be decoders
-         * that do not call ff_get_buffer() */
-        av_assert0((frame->opaque_ref && frame->opaque_ref->size == sizeof(FrameDecodeData)) ||
-                   !(avctx->codec->capabilities & AV_CODEC_CAP_DR1));
-
-        if (frame->opaque_ref) {
-            FrameDecodeData *fdd;
-            AVBufferRef *user_opaque_ref;
-
-            fdd = (FrameDecodeData*)frame->opaque_ref->data;
-
-            user_opaque_ref = fdd->user_opaque_ref;
-            fdd->user_opaque_ref = NULL;
-            av_buffer_unref(&frame->opaque_ref);
-            frame->opaque_ref = user_opaque_ref;
-        }
-    }
-
     return ret;
 }
 
@@ -1652,37 +1632,6 @@ static void validate_avframe_allocation(AVCodecContext *avctx, AVFrame *frame)
     }
 }
 
-static void decode_data_free(void *opaque, uint8_t *data)
-{
-    FrameDecodeData *fdd = (FrameDecodeData*)data;
-
-    av_buffer_unref(&fdd->user_opaque_ref);
-
-    av_freep(&fdd);
-}
-
-int ff_attach_decode_data(AVFrame *frame)
-{
-    AVBufferRef *fdd_buf;
-    FrameDecodeData *fdd;
-
-    fdd = av_mallocz(sizeof(*fdd));
-    if (!fdd)
-        return AVERROR(ENOMEM);
-
-    fdd_buf = av_buffer_create((uint8_t*)fdd, sizeof(*fdd), decode_data_free,
-                               NULL, AV_BUFFER_FLAG_READONLY);
-    if (!fdd_buf) {
-        av_freep(&fdd);
-        return AVERROR(ENOMEM);
-    }
-
-    fdd->user_opaque_ref = frame->opaque_ref;
-    frame->opaque_ref    = fdd_buf;
-
-    return 0;
-}
-
 static int get_buffer_internal(AVCodecContext *avctx, AVFrame *frame, int flags)
 {
     const AVHWAccel *hwaccel = avctx->hwaccel;
@@ -1719,14 +1668,8 @@ static int get_buffer_internal(AVCodecContext *avctx, AVFrame *frame, int flags)
         avctx->sw_pix_fmt = avctx->pix_fmt;
 
     ret = avctx->get_buffer2(avctx, frame, flags);
-    if (ret < 0)
-        goto end;
-
-    validate_avframe_allocation(avctx, frame);
-
-    ret = ff_attach_decode_data(frame);
-    if (ret < 0)
-        goto end;
+    if (ret >= 0)
+        validate_avframe_allocation(avctx, frame);
 
 end:
     if (avctx->codec_type == AVMEDIA_TYPE_VIDEO && !override_dimensions &&
@@ -1833,39 +1776,4 @@ void ff_decode_bsfs_uninit(AVCodecContext *avctx)
         av_bsf_free(&s->bsfs[i]);
     av_freep(&s->bsfs);
     s->nb_bsfs = 0;
-}
-
-void ff_call_draw_horiz_band(struct AVCodecContext *s,
-                             const AVFrame *src, int offset[AV_NUM_DATA_POINTERS],
-                             int y, int type, int height)
-{
-    AVFrame *user_frame;
-
-    if (!s->draw_horiz_band)
-        return;
-
-    user_frame = av_frame_clone(src);
-    if (!user_frame) {
-        av_log(s, AV_LOG_ERROR, "draw_horiz_band() failed\n");
-        goto done;
-    }
-
-    av_buffer_unref(&user_frame->opaque_ref);
-
-    if (src->opaque_ref) {
-        FrameDecodeData *fdd = (FrameDecodeData*)src->opaque_ref->data;
-
-        if (fdd->user_opaque_ref) {
-            user_frame->opaque_ref = av_buffer_ref(fdd->user_opaque_ref);
-            if (!user_frame->opaque_ref) {
-                av_log(s, AV_LOG_ERROR, "draw_horiz_band() failed\n");
-                goto done;
-            }
-        }
-    }
-
-    s->draw_horiz_band(s, user_frame, offset, y, type, height);
-
-done:
-    av_frame_unref(user_frame);
 }
