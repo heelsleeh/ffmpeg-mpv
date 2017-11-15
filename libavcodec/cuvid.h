@@ -54,12 +54,9 @@ typedef struct CUVIDContext {
     unsigned int  slice_offsets_allocated;
 } CUVIDContext;
 
-int ff_cuvid_decode_init(AVCodecContext *avctx);
+int ff_cuvid_decode_init(AVCodecContext *avctx, unsigned int dpb_size);
 int ff_cuvid_decode_uninit(AVCodecContext *avctx);
 int ff_cuvid_start_frame(AVCodecContext *avctx, AVFrame *frame);
 int ff_cuvid_end_frame(AVCodecContext *avctx);
-int ff_cuvid_frame_params(AVCodecContext *avctx,
-                          AVBufferRef *hw_frames_ctx,
-                          int dpb_size);
 
 #endif /* AVCODEC_CUVID_H */

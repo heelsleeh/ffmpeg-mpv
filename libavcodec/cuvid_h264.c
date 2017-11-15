@@ -155,12 +155,11 @@ static int cuvid_h264_decode_slice(AVCodecContext *avctx, const uint8_t *buffer,
     return 0;
 }
 
-static int cuvid_h264_frame_params(AVCodecContext *avctx,
-                                   AVBufferRef *hw_frames_ctx)
+static int cuvid_h264_decode_init(AVCodecContext *avctx)
 {
     const H264Context *h = avctx->priv_data;
     const SPS       *sps = h->ps.sps;
-    return ff_cuvid_frame_params(avctx, hw_frames_ctx, sps->ref_frame_count + sps->num_reorder_frames);
+    return ff_cuvid_decode_init(avctx, sps->ref_frame_count + sps->num_reorder_frames);
 }
 
 AVHWAccel ff_h264_cuvid_hwaccel_hwaccel = {
@@ -171,8 +170,7 @@ AVHWAccel ff_h264_cuvid_hwaccel_hwaccel = {
     .start_frame          = cuvid_h264_start_frame,
     .end_frame            = ff_cuvid_end_frame,
     .decode_slice         = cuvid_h264_decode_slice,
-    .frame_params         = cuvid_h264_frame_params,
-    .init                 = ff_cuvid_decode_init,
+    .init                 = cuvid_h264_decode_init,
     .uninit               = ff_cuvid_decode_uninit,
     .priv_data_size       = sizeof(CUVIDContext),
 };
