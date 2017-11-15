@@ -1096,19 +1096,15 @@ enum AVPixelFormat avcodec_default_get_format(struct AVCodecContext *s, const en
     return fmt[0];
 }
 
-static AVHWAccel *find_hwaccel(AVCodecContext *avctx,
+static AVHWAccel *find_hwaccel(enum AVCodecID codec_id,
                                enum AVPixelFormat pix_fmt)
 {
     AVHWAccel *hwaccel = NULL;
-    const AVClass *av_class =
-        (avctx->codec->caps_internal & FF_CODEC_CAP_HWACCEL_REQUIRE_CLASS)
-        ? avctx->codec->priv_class : NULL;
 
-    while ((hwaccel = av_hwaccel_next(hwaccel))) {
-        if (hwaccel->decoder_class == av_class && hwaccel->id == avctx->codec_id
+    while ((hwaccel = av_hwaccel_next(hwaccel)))
+        if (hwaccel->id == codec_id
             && hwaccel->pix_fmt == pix_fmt)
             return hwaccel;
-    }
     return NULL;
 }
 
@@ -1173,7 +1169,7 @@ int avcodec_get_hw_frames_parameters(AVCodecContext *avctx,
                                      AVBufferRef **out_frames_ref)
 {
     AVBufferRef *frames_ref = NULL;
-    AVHWAccel *hwa = find_hwaccel(avctx, hw_pix_fmt);
+    AVHWAccel *hwa = find_hwaccel(avctx->codec_id, hw_pix_fmt);
     int ret;
 
     if (!hwa || !hwa->frame_params)
@@ -1196,7 +1192,7 @@ static int setup_hwaccel(AVCodecContext *avctx,
                          const enum AVPixelFormat fmt,
                          const char *name)
 {
-    AVHWAccel *hwa = find_hwaccel(avctx, fmt);
+    AVHWAccel *hwa = find_hwaccel(avctx->codec_id, fmt);
     int ret        = 0;
 
     if (!hwa) {
