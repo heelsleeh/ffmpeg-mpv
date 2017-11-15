@@ -11,6 +11,10 @@ version <next>:
 - TiVo ty/ty+ demuxer
 - Intel QSV-accelerated MJPEG encoding
 - PCE support for extended channel layouts in the AAC encoder
+- native aptX encoder and decoder
+- Raw aptX muxer and demuxer
+- NVIDIA NVDEC-accelerated H.264, HEVC, VC1 and VP9 hwaccel decoding
+- Intel QSV-accelerated overlay filter
 
 
 version 3.4:

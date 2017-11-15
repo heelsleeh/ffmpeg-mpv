@@ -63,10 +63,14 @@
 #endif
 #endif
 
-#if defined(_MSC_VER) && CONFIG_SHARED
-#    define av_export __declspec(dllimport)
+#if defined(_WIN32) && CONFIG_SHARED
+#ifdef BUILDING_avutil
+#    define av_export_avutil __declspec(dllexport)
 #else
-#    define av_export
+#    define av_export_avutil __declspec(dllimport)
+#endif
+#else
+#    define av_export_avutil
 #endif
 
 #if HAVE_PRAGMA_DEPRECATED
@@ -77,8 +81,8 @@
 #        define FF_DISABLE_DEPRECATION_WARNINGS __pragma(warning(push)) __pragma(warning(disable:4996))
 #        define FF_ENABLE_DEPRECATION_WARNINGS  __pragma(warning(pop))
 #    else
-#        define FF_DISABLE_DEPRECATION_WARNINGS _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
-#        define FF_ENABLE_DEPRECATION_WARNINGS  _Pragma("GCC diagnostic warning \"-Wdeprecated-declarations\"")
+#        define FF_DISABLE_DEPRECATION_WARNINGS _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
+#        define FF_ENABLE_DEPRECATION_WARNINGS  _Pragma("GCC diagnostic pop")
 #    endif
 #else
 #    define FF_DISABLE_DEPRECATION_WARNINGS

@@ -613,6 +613,28 @@ static int decode_receive_frame_internal(AVCodecContext *avctx, AVFrame *frame)
     if (ret == AVERROR_EOF)
         avci->draining_done = 1;
 
+    if (!ret) {
+        /* the only case where decode data is not set should be decoders
+         * that do not call ff_get_buffer() */
+        av_assert0((frame->private_ref && frame->private_ref->size == sizeof(FrameDecodeData)) ||
+                   !(avctx->codec->capabilities & AV_CODEC_CAP_DR1));
+
+        if (frame->private_ref) {
+            FrameDecodeData *fdd = (FrameDecodeData*)frame->private_ref->data;
+
+            if (fdd->post_process) {
+                ret = fdd->post_process(avctx, frame);
+                if (ret < 0) {
+                    av_frame_unref(frame);
+                    return ret;
+                }
+            }
+        }
+    }
+
+    /* free the per-frame decode data */
+    av_buffer_unref(&frame->private_ref);
+
     return ret;
 }
 
@@ -1068,15 +1090,19 @@ enum AVPixelFormat avcodec_default_get_format(struct AVCodecContext *s, const en
     return fmt[0];
 }
 
-static AVHWAccel *find_hwaccel(enum AVCodecID codec_id,
+static AVHWAccel *find_hwaccel(AVCodecContext *avctx,
                                enum AVPixelFormat pix_fmt)
 {
     AVHWAccel *hwaccel = NULL;
+    const AVClass *av_class =
+        (avctx->codec->caps_internal & FF_CODEC_CAP_HWACCEL_REQUIRE_CLASS)
+        ? avctx->codec->priv_class : NULL;
 
-    while ((hwaccel = av_hwaccel_next(hwaccel)))
-        if (hwaccel->id == codec_id
+    while ((hwaccel = av_hwaccel_next(hwaccel))) {
+        if (hwaccel->decoder_class == av_class && hwaccel->id == avctx->codec_id
             && hwaccel->pix_fmt == pix_fmt)
             return hwaccel;
+    }
     return NULL;
 }
 
@@ -1141,7 +1167,7 @@ int avcodec_get_hw_frames_parameters(AVCodecContext *avctx,
                                      AVBufferRef **out_frames_ref)
 {
     AVBufferRef *frames_ref = NULL;
-    AVHWAccel *hwa = find_hwaccel(avctx->codec_id, hw_pix_fmt);
+    AVHWAccel *hwa = find_hwaccel(avctx, hw_pix_fmt);
     int ret;
 
     if (!hwa || !hwa->frame_params)
@@ -1164,7 +1190,7 @@ static int setup_hwaccel(AVCodecContext *avctx,
                          const enum AVPixelFormat fmt,
                          const char *name)
 {
-    AVHWAccel *hwa = find_hwaccel(avctx->codec_id, fmt);
+    AVHWAccel *hwa = find_hwaccel(avctx, fmt);
     int ret        = 0;
 
     if (!hwa) {
@@ -1632,6 +1658,43 @@ static void validate_avframe_allocation(AVCodecContext *avctx, AVFrame *frame)
     }
 }
 
+static void decode_data_free(void *opaque, uint8_t *data)
+{
+    FrameDecodeData *fdd = (FrameDecodeData*)data;
+
+    if (fdd->post_process_opaque_free)
+        fdd->post_process_opaque_free(fdd->post_process_opaque);
+
+    if (fdd->hwaccel_priv_free)
+        fdd->hwaccel_priv_free(fdd->hwaccel_priv);
+
+    av_freep(&fdd);
+}
+
+int ff_attach_decode_data(AVFrame *frame)
+{
+    AVBufferRef *fdd_buf;
+    FrameDecodeData *fdd;
+
+    av_assert1(!frame->private_ref);
+    av_buffer_unref(&frame->private_ref);
+
+    fdd = av_mallocz(sizeof(*fdd));
+    if (!fdd)
+        return AVERROR(ENOMEM);
+
+    fdd_buf = av_buffer_create((uint8_t*)fdd, sizeof(*fdd), decode_data_free,
+                               NULL, AV_BUFFER_FLAG_READONLY);
+    if (!fdd_buf) {
+        av_freep(&fdd);
+        return AVERROR(ENOMEM);
+    }
+
+    frame->private_ref = fdd_buf;
+
+    return 0;
+}
+
 static int get_buffer_internal(AVCodecContext *avctx, AVFrame *frame, int flags)
 {
     const AVHWAccel *hwaccel = avctx->hwaccel;
@@ -1668,8 +1731,14 @@ static int get_buffer_internal(AVCodecContext *avctx, AVFrame *frame, int flags)
         avctx->sw_pix_fmt = avctx->pix_fmt;
 
     ret = avctx->get_buffer2(avctx, frame, flags);
-    if (ret >= 0)
-        validate_avframe_allocation(avctx, frame);
+    if (ret < 0)
+        goto end;
+
+    validate_avframe_allocation(avctx, frame);
+
+    ret = ff_attach_decode_data(frame);
+    if (ret < 0)
+        goto end;
 
 end:
     if (avctx->codec_type == AVMEDIA_TYPE_VIDEO && !override_dimensions &&
