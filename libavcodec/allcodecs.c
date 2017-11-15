@@ -76,7 +76,6 @@ static void register_all(void)
     REGISTER_HWACCEL(H264_VDPAU,        h264_vdpau);
     REGISTER_HWACCEL(H264_VIDEOTOOLBOX, h264_videotoolbox);
     REGISTER_HWACCEL(HEVC_CUVID,        hevc_cuvid);
-    REGISTER_HWACCEL(HEVC_CUVID,        hevc_cuvid_hwaccel);
     REGISTER_HWACCEL(HEVC_D3D11VA,      hevc_d3d11va);
     REGISTER_HWACCEL(HEVC_D3D11VA2,     hevc_d3d11va2);
     REGISTER_HWACCEL(HEVC_DXVA2,        hevc_dxva2);

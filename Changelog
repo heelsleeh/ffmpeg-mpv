@@ -101,7 +101,7 @@ version 3.3:
 - Removed asyncts filter (use af_aresample instead)
 - Intel QSV-accelerated VP8 video decoding
 - VAAPI-accelerated deinterlacing
-- NVIDIA CUVID-accelerated H.264 and HEVC decoding
+- NVIDIA CUVID-accelerated H.264 hwaccel decoding
 
 
 version 3.2:
