@@ -462,7 +462,6 @@ EOF
   exit 0
 }
 
-quotes='""'
 if test -t 1 && which tput >/dev/null 2>&1; then
     ncolors=$(tput colors)
     if test -n "$ncolors" && test $ncolors -ge 8; then
@@ -3378,6 +3377,7 @@ pkg_config_default=pkg-config
 ranlib_default="ranlib"
 strip_default="strip"
 version_script='--version-script'
+objformat="elf32"
 x86asmexe_default="nasm"
 windres_default="windres"
 nvcc_default="nvcc"
@@ -3733,6 +3733,8 @@ enable_weak $HWACCEL_AUTODETECT_LIBRARY_LIST
 
 disabled logging && logfile=/dev/null
 
+# command line configuration sanity checks
+
 # we need to build at least one lib type
 if ! enabled_any static shared; then
     cat <<EOF
@@ -3884,11 +3886,10 @@ case "$toolchain" in
     ;;
 esac
 
-test -n "$cross_prefix" && enable cross_compile
-
-if enabled cross_compile; then
+if test -n "$cross_prefix"; then
     test -n "$arch" && test -n "$target_os" ||
         die "Must specify target arch (--arch) and OS (--target-os) when cross-compiling"
+    enable cross_compile
 fi
 
 ar_default="${cross_prefix}${ar_default}"
@@ -4820,52 +4821,44 @@ check_64bit(){
     expr=$3
     check_code cc "" "int test[2*($expr) - 1]" &&
         subarch=$arch64 || subarch=$arch32
+    enable $subarch
 }
 
 case "$arch" in
     aarch64|alpha|ia64)
-        spic=$shared
+        enabled shared && enable_weak pic
     ;;
     mips)
         check_64bit mips mips64 '_MIPS_SIM > 1'
-        spic=$shared
+        enabled shared && enable_weak pic
     ;;
     parisc)
         check_64bit parisc parisc64 'sizeof(void *) > 4'
-        spic=$shared
+        enabled shared && enable_weak pic
     ;;
     ppc)
         check_64bit ppc ppc64 'sizeof(void *) > 4'
-        spic=$shared
+        enabled shared && enable_weak pic
     ;;
     s390)
         check_64bit s390 s390x 'sizeof(void *) > 4'
-        spic=$shared
+        enabled shared && enable_weak pic
     ;;
     sparc)
         check_64bit sparc sparc64 'sizeof(void *) > 4'
-        spic=$shared
+        enabled shared && enable_weak pic
     ;;
     x86)
         check_64bit x86_32 x86_64 'sizeof(void *) > 4'
-        # Treat x32 as x64 for now. Note it also needs spic=$shared
+        # Treat x32 as x64 for now. Note it also needs pic if shared
         test "$subarch" = "x86_32" && check_cpp_condition stddef.h 'defined(__x86_64__)' &&
-            subarch=x86_64
-        if test "$subarch" = "x86_64"; then
-            spic=$shared
+            subarch=x86_64 && enable x86_64 && disable x86_32
+        if enabled x86_64; then
+            enabled shared && enable_weak pic
+            objformat=elf64
         fi
     ;;
-    ppc)
-        check_cc <<EOF && subarch="ppc64"
-        int test[(int)sizeof(char*) - 7];
-EOF
-    ;;
 esac
-
-enable $subarch
-enabled spic && enable_weak pic
-
-enabled x86_64 && objformat=elf64 || objformat="elf32"
 
 # OS specific
 case $target_os in
@@ -4889,7 +4882,7 @@ case $target_os in
         ;;
     sunos)
         SHFLAGS='-shared -Wl,-h,$$(@F)'
-        enabled x86 && SHFLAGS="-mimpure-text $SHFLAGS"
+        enabled x86 && append SHFLAGS -mimpure-text
         network_extralibs="-lsocket -lnsl"
         add_cppflags -D__EXTENSIONS__
         # When using suncc to build, the Solaris linker will mark
@@ -4971,7 +4964,7 @@ case $target_os in
         SLIB_INSTALL_LINKS=
         SLIB_INSTALL_EXTRA_SHLIB='$(SLIBNAME:$(SLIBSUF)=.lib)'
         SLIB_INSTALL_EXTRA_LIB='lib$(SLIBNAME:$(SLIBSUF)=.dll.a) $(SLIBNAME_WITH_MAJOR:$(SLIBSUF)=.def)'
-        SLIB_CREATE_DEF_CMD='ARCH="$(ARCH)" AR="$(AR_CMD)" NM="$(NM_CMD)" $(SRC_PATH)/compat/windows/makedef $(SUBDIR)lib$(NAME).ver $(OBJS) > $$(@:$(SLIBSUF)=.def)'
+        SLIB_CREATE_DEF_CMD='EXTERN_PREFIX="$(EXTERN_PREFIX)" AR="$(AR_CMD)" NM="$(NM_CMD)" $(SRC_PATH)/compat/windows/makedef $(SUBDIR)lib$(NAME).ver $(OBJS) > $$(@:$(SLIBSUF)=.def)'
         SHFLAGS='-shared -Wl,--out-implib,$(SUBDIR)lib$(SLIBNAME:$(SLIBSUF)=.dll.a) -Wl,--disable-auto-image-base $$(@:$(SLIBSUF)=.def)'
         enabled x86_64 && objformat="win64" || objformat="win32"
         ranlib=:
@@ -5007,7 +5000,7 @@ case $target_os in
         SLIBSUF=".dll"
         SLIBNAME_WITH_VERSION='$(SLIBPREF)$(FULLNAME)-$(LIBVERSION)$(SLIBSUF)'
         SLIBNAME_WITH_MAJOR='$(SLIBPREF)$(FULLNAME)-$(LIBMAJOR)$(SLIBSUF)'
-        SLIB_CREATE_DEF_CMD='$(SRC_PATH)/compat/windows/makedef $(SUBDIR)lib$(NAME).ver $(OBJS) > $$(@:$(SLIBSUF)=.def)'
+        SLIB_CREATE_DEF_CMD='EXTERN_PREFIX="$(EXTERN_PREFIX)" $(SRC_PATH)/compat/windows/makedef $(SUBDIR)lib$(NAME).ver $(OBJS) > $$(@:$(SLIBSUF)=.def)'
         SLIB_INSTALL_NAME='$(SLIBNAME_WITH_MAJOR)'
         SLIB_INSTALL_LINKS=
         SLIB_INSTALL_EXTRA_SHLIB='$(SLIBNAME:$(SLIBSUF)=.lib)'
@@ -5774,15 +5767,12 @@ if ! disabled pthreads && ! enabled w32threads && ! enabled os2threads; then
         enable pthreads
     fi
     check_code cc "pthread.h" "static pthread_mutex_t atomic_lock = PTHREAD_MUTEX_INITIALIZER" || disable pthreads
+
+    if enabled pthreads; then
+        check_builtin sem_timedwait semaphore.h "sem_t *s; sem_init(s,0,0); sem_timedwait(s,0); sem_destroy(s)" $pthreads_extralibs
+        check_func pthread_cancel $pthreads_extralibs
+    fi
 fi
-
-
-if enabled pthreads; then
-  check_func pthread_cancel $pthreads_extralibs
-fi
-
-enabled pthreads &&
-    check_builtin sem_timedwait semaphore.h "sem_t *s; sem_init(s,0,0); sem_timedwait(s,0); sem_destroy(s)" $pthreads_extralibs
 
 enabled  zlib && check_lib zlib   zlib.h      zlibVersion    -lz
 enabled bzlib && check_lib bzlib bzlib.h BZ2_bzlibVersion    -lbz2
@@ -6292,6 +6282,7 @@ if enabled proper_dce; then
     echo "X { local: *; };" > $TMPV
     if test_ldflags -Wl,${version_script},$TMPV; then
         append SHFLAGS '-Wl,${version_script},\$(SUBDIR)lib\$(NAME).ver'
+        quotes='""'
         check_cc <<EOF && enable symver_asm_label
 void ff_foo(void) __asm__ ("av_foo@VERSION");
 void ff_foo(void) { ${inline_asm+__asm__($quotes);} }
@@ -6504,6 +6495,15 @@ flatten_extralibs(){
     fi
 }
 
+flatten_extralibs_wrapper(){
+    list_name=$1
+    flatten_extralibs $list_name
+    unique $list_name
+    resolve $list_name
+    eval $list_name=\$\(\$ldflags_filter \$$list_name\)
+    eval printf \''%s'\' \""\$$list_name"\"
+}
+
 for linkunit in $LIBRARY_LIST; do
     unset current_extralibs
     eval components=\$$(toupper ${linkunit})_COMPONENTS_LIST
@@ -6516,10 +6516,7 @@ for linkunit in $LIBRARY_LIST; do
 done
 
 for linkunit in $LIBRARY_LIST $PROGRAM_LIST $EXTRALIBS_LIST; do
-    flatten_extralibs ${linkunit}_extralibs
-    unique  ${linkunit}_extralibs
-    resolve ${linkunit}_extralibs
-    eval ${linkunit}_extralibs=\$\(\$ldflags_filter \$${linkunit}_extralibs\)
+    eval ${linkunit}_extralibs=\$\(flatten_extralibs_wrapper ${linkunit}_extralibs\)
 done
 
 map 'enabled $v && intrinsics=${v#intrinsics_}' $INTRINSICS_LIST
@@ -6780,6 +6777,7 @@ endif
 CC_IDENT=$cc_ident
 ARCH=$arch
 INTRINSICS=$intrinsics
+EXTERN_PREFIX=$extern_prefix
 CC=$cc
 CXX=$cxx
 AS=$as
