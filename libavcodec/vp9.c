@@ -1794,4 +1794,5 @@ AVCodec ff_vp9_decoder = {
     .init_thread_copy      = ONLY_IF_THREADS_ENABLED(vp9_decode_init_thread_copy),
     .update_thread_context = ONLY_IF_THREADS_ENABLED(vp9_decode_update_thread_context),
     .profiles              = NULL_IF_CONFIG_SMALL(ff_vp9_profiles),
+    .bsfs                  = "vp9_superframe_split",
 };
