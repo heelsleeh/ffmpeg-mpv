@@ -1188,6 +1188,10 @@ static void set_frag_stream(MOVFragmentIndex *frag_index, int id)
 static MOVFragmentStreamInfo * get_current_frag_stream_info(
     MOVFragmentIndex *frag_index)
 {
+    if (frag_index->current < 0 ||
+        frag_index->current >= frag_index->nb_items)
+        return NULL;
+
     MOVFragmentIndexItem * item = &frag_index->item[frag_index->current];
     if (item->current >= 0 && item->current < item->nb_stream_info)
         return &item->stream_info[item->current];
@@ -3553,6 +3557,7 @@ static void mov_fix_index(MOVContext *mov, AVStream *st)
     // Free the old index and the old CTTS structures
     av_free(e_old);
     av_free(ctts_data_old);
+    av_freep(&frame_duration_buffer);
 
     // Null terminate the index ranges array
     current_index_range++;
