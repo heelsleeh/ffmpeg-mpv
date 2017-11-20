@@ -1686,6 +1686,21 @@ static int mov_write_sv3d_tag(AVFormatContext *s, AVIOContext *pb, AVSphericalMa
     return update_size(pb, sv3d_pos);
 }
 
+static int mov_write_clap_tag(AVIOContext *pb, MOVTrack *track)
+{
+    avio_wb32(pb, 40);
+    ffio_wfourcc(pb, "clap");
+    avio_wb32(pb, track->par->width); /* apertureWidth_N */
+    avio_wb32(pb, 1); /* apertureWidth_D (= 1) */
+    avio_wb32(pb, track->height); /* apertureHeight_N */
+    avio_wb32(pb, 1); /* apertureHeight_D (= 1) */
+    avio_wb32(pb, 0); /* horizOff_N (= 0) */
+    avio_wb32(pb, 1); /* horizOff_D (= 1) */
+    avio_wb32(pb, 0); /* vertOff_N (= 0) */
+    avio_wb32(pb, 1); /* vertOff_D (= 1) */
+    return 40;
+}
+
 static int mov_write_pasp_tag(AVIOContext *pb, MOVTrack *track)
 {
     AVRational sar;
@@ -1832,6 +1847,13 @@ static int mov_write_video_tag(AVIOContext *pb, MOVMuxContext *mov, MOVTrack *tr
     char compressor_name[32] = { 0 };
     int avid = 0;
 
+    int uncompressed_ycbcr = ((track->par->codec_id == AV_CODEC_ID_RAWVIDEO && track->par->format == AV_PIX_FMT_UYVY422)
+                           || (track->par->codec_id == AV_CODEC_ID_RAWVIDEO && track->par->format == AV_PIX_FMT_YUYV422)
+                           ||  track->par->codec_id == AV_CODEC_ID_V308
+                           ||  track->par->codec_id == AV_CODEC_ID_V408
+                           ||  track->par->codec_id == AV_CODEC_ID_V410
+                           ||  track->par->codec_id == AV_CODEC_ID_V210);
+
     avio_wb32(pb, 0); /* size */
     if (mov->encryption_scheme != MOV_ENC_NONE) {
         ffio_wfourcc(pb, "encv");
@@ -1842,11 +1864,15 @@ static int mov_write_video_tag(AVIOContext *pb, MOVMuxContext *mov, MOVTrack *tr
     avio_wb16(pb, 0); /* Reserved */
     avio_wb16(pb, 1); /* Data-reference index */
 
-    avio_wb16(pb, 0); /* Codec stream version */
+    if (uncompressed_ycbcr) {
+        avio_wb16(pb, 2); /* Codec stream version */
+    } else {
+        avio_wb16(pb, 0); /* Codec stream version */
+    }
     avio_wb16(pb, 0); /* Codec stream revision (=0) */
     if (track->mode == MODE_MOV) {
         ffio_wfourcc(pb, "FFMP"); /* Vendor */
-        if (track->par->codec_id == AV_CODEC_ID_RAWVIDEO) {
+        if (track->par->codec_id == AV_CODEC_ID_RAWVIDEO || uncompressed_ycbcr) {
             avio_wb32(pb, 0); /* Temporal Quality */
             avio_wb32(pb, 0x400); /* Spatial Quality = lossless*/
         } else {
@@ -1870,7 +1896,10 @@ static int mov_write_video_tag(AVIOContext *pb, MOVMuxContext *mov, MOVTrack *tr
     avio_w8(pb, strlen(compressor_name));
     avio_write(pb, compressor_name, 31);
 
-    if (track->mode == MODE_MOV && track->par->bits_per_coded_sample)
+    if (track->mode == MODE_MOV &&
+       (track->par->codec_id == AV_CODEC_ID_V410 || track->par->codec_id == AV_CODEC_ID_V210))
+        avio_wb16(pb, 0x18);
+    else if (track->mode == MODE_MOV && track->par->bits_per_coded_sample)
         avio_wb16(pb, track->par->bits_per_coded_sample |
                   (track->par->format == AV_PIX_FMT_GRAY8 ? 0x20 : 0));
     else
@@ -1968,6 +1997,10 @@ static int mov_write_video_tag(AVIOContext *pb, MOVMuxContext *mov, MOVTrack *tr
 
     if (track->par->sample_aspect_ratio.den && track->par->sample_aspect_ratio.num) {
         mov_write_pasp_tag(pb, track);
+    }
+
+    if (uncompressed_ycbcr){
+        mov_write_clap_tag(pb, track);
     }
 
     if (mov->encryption_scheme != MOV_ENC_NONE) {
