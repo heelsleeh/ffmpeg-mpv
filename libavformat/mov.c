@@ -1188,11 +1188,12 @@ static void set_frag_stream(MOVFragmentIndex *frag_index, int id)
 static MOVFragmentStreamInfo * get_current_frag_stream_info(
     MOVFragmentIndex *frag_index)
 {
+    MOVFragmentIndexItem *item;
     if (frag_index->current < 0 ||
         frag_index->current >= frag_index->nb_items)
         return NULL;
 
-    MOVFragmentIndexItem * item = &frag_index->item[frag_index->current];
+    item = &frag_index->item[frag_index->current];
     if (item->current >= 0 && item->current < item->nb_stream_info)
         return &item->stream_info[item->current];
 
@@ -1732,6 +1733,7 @@ static int mov_read_ares(MOVContext *c, AVIOContext *pb, MOVAtom atom)
                 par->width = 1440;
             return 0;
         } else if ((par->codec_tag == MKTAG('A', 'V', 'd', '1') ||
+                    par->codec_tag == MKTAG('A', 'V', 'j', '2') ||
                     par->codec_tag == MKTAG('A', 'V', 'd', 'n')) &&
                    atom.size >= 24) {
             int num, den;
@@ -2436,8 +2438,7 @@ int ff_mov_read_stsd_entries(MOVContext *c, AVIOContext *pb, int entries)
     MOVStreamContext *sc;
     int pseudo_stream_id;
 
-    if (c->fc->nb_streams < 1)
-        return 0;
+    av_assert0 (c->fc->nb_streams >= 1);
     st = c->fc->streams[c->fc->nb_streams-1];
     sc = st->priv_data;
 
@@ -2463,8 +2464,10 @@ int ff_mov_read_stsd_entries(MOVContext *c, AVIOContext *pb, int entries)
         }
 
         if (mov_skip_multiple_stsd(c, pb, st->codecpar->codec_tag, format,
-                                   size - (avio_tell(pb) - start_pos)))
+                                   size - (avio_tell(pb) - start_pos))) {
+            sc->stsd_count++;
             continue;
+        }
 
         sc->pseudo_stream_id = st->codecpar->codec_tag ? -1 : pseudo_stream_id;
         sc->dref_id= dref_id;
@@ -2516,6 +2519,7 @@ int ff_mov_read_stsd_entries(MOVContext *c, AVIOContext *pb, int entries)
             av_freep(&st->codecpar->extradata);
             st->codecpar->extradata_size = 0;
         }
+        sc->stsd_count++;
     }
 
     if (pb->eof_reached)
@@ -2564,8 +2568,6 @@ static int mov_read_stsd(MOVContext *c, AVIOContext *pb, MOVAtom atom)
     ret = ff_mov_read_stsd_entries(c, pb, entries);
     if (ret < 0)
         goto fail;
-
-    sc->stsd_count = entries;
 
     /* Restore back the primary extradata. */
     av_freep(&st->codecpar->extradata);
@@ -4813,7 +4815,7 @@ static int mov_read_sidx(MOVContext *c, AVIOContext *pb, MOVAtom atom)
                 MOVFragmentStreamInfo * si;
                 si = &item->stream_info[j];
                 if (si->sidx_pts != AV_NOPTS_VALUE) {
-                    ref_st = c->fc->streams[i];
+                    ref_st = c->fc->streams[j];
                     ref_sc = ref_st->priv_data;
                     break;
                 }
@@ -6752,6 +6754,7 @@ static int should_retry(AVIOContext *pb, int error_code) {
 
 static int mov_switch_root(AVFormatContext *s, int64_t target, int index)
 {
+    int ret;
     MOVContext *mov = s->priv_data;
 
     if (index >= 0 && index < mov->frag_index.nb_items)
@@ -6774,8 +6777,10 @@ static int mov_switch_root(AVFormatContext *s, int64_t target, int index)
 
     mov->found_mdat = 0;
 
-    if (mov_read_default(mov, s->pb, (MOVAtom){ AV_RL32("root"), INT64_MAX }) < 0 ||
-        avio_feof(s->pb))
+    ret = mov_read_default(mov, s->pb, (MOVAtom){ AV_RL32("root"), INT64_MAX });
+    if (ret < 0)
+        return ret;
+    if (avio_feof(s->pb))
         return AVERROR_EOF;
     av_log(s, AV_LOG_TRACE, "read fragments, offset 0x%"PRIx64"\n", avio_tell(s->pb));
 

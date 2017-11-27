@@ -34,6 +34,7 @@
 #include <stdatomic.h>
 
 #include "avcodec.h"
+#include "hwaccel.h"
 #include "internal.h"
 #include "libavutil/avassert.h"
 #include "libavutil/buffer.h"
@@ -807,32 +808,9 @@ static int ffmmal_decode(AVCodecContext *avctx, void *data, int *got_frame,
     return ret;
 }
 
-AVHWAccel ff_h264_mmal_hwaccel = {
-    .name       = "h264_mmal",
-    .type       = AVMEDIA_TYPE_VIDEO,
-    .id         = AV_CODEC_ID_H264,
-    .pix_fmt    = AV_PIX_FMT_MMAL,
-};
-
-AVHWAccel ff_mpeg2_mmal_hwaccel = {
-    .name       = "mpeg2_mmal",
-    .type       = AVMEDIA_TYPE_VIDEO,
-    .id         = AV_CODEC_ID_MPEG2VIDEO,
-    .pix_fmt    = AV_PIX_FMT_MMAL,
-};
-
-AVHWAccel ff_mpeg4_mmal_hwaccel = {
-    .name       = "mpeg4_mmal",
-    .type       = AVMEDIA_TYPE_VIDEO,
-    .id         = AV_CODEC_ID_MPEG4,
-    .pix_fmt    = AV_PIX_FMT_MMAL,
-};
-
-AVHWAccel ff_vc1_mmal_hwaccel = {
-    .name       = "vc1_mmal",
-    .type       = AVMEDIA_TYPE_VIDEO,
-    .id         = AV_CODEC_ID_VC1,
-    .pix_fmt    = AV_PIX_FMT_MMAL,
+static const AVCodecHWConfigInternal *mmal_hw_configs[] = {
+    HW_CONFIG_INTERNAL(MMAL),
+    NULL
 };
 
 static const AVOption options[]={
@@ -867,6 +845,7 @@ static const AVOption options[]={
         .pix_fmts       = (const enum AVPixelFormat[]) { AV_PIX_FMT_MMAL, \
                                                          AV_PIX_FMT_YUV420P, \
                                                          AV_PIX_FMT_NONE}, \
+        .hw_configs     = mmal_hw_configs, \
     };
 
 FFMMAL_DEC(h264, AV_CODEC_ID_H264)

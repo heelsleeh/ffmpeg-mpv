@@ -1,6 +1,4 @@
 /*
- * Copyright (C) 2013 Wei Gao <weigao@multicorewareinc.com>
- *
  * This file is part of FFmpeg.
  *
  * FFmpeg is free software; you can redistribute it and/or
@@ -18,17 +16,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef AVFILTER_UNSHARP_OPENCL_H
-#define AVFILTER_UNSHARP_OPENCL_H
+#ifndef AVFILTER_OPENCL_SOURCE_H
+#define AVFILTER_OPENCL_SOURCE_H
 
-#include "unsharp.h"
+extern const char *ff_opencl_source_overlay;
+extern const char *ff_opencl_source_unsharp;
 
-int ff_opencl_unsharp_init(AVFilterContext *ctx);
-
-void ff_opencl_unsharp_uninit(AVFilterContext *ctx);
-
-int ff_opencl_unsharp_process_inout_buf(AVFilterContext *ctx, AVFrame *in, AVFrame *out);
-
-int ff_opencl_apply_unsharp(AVFilterContext *ctx, AVFrame *in, AVFrame *out);
-
-#endif /* AVFILTER_UNSHARP_OPENCL_H */
+#endif /* AVFILTER_OPENCL_SOURCE_H */

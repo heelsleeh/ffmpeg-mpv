@@ -41,6 +41,9 @@ static const HWContextType * const hw_table[] = {
 #if CONFIG_DXVA2
     &ff_hwcontext_type_dxva2,
 #endif
+#if CONFIG_OPENCL
+    &ff_hwcontext_type_opencl,
+#endif
 #if CONFIG_QSV
     &ff_hwcontext_type_qsv,
 #endif
@@ -61,6 +64,7 @@ static const char *const hw_type_names[] = {
     [AV_HWDEVICE_TYPE_DRM]    = "drm",
     [AV_HWDEVICE_TYPE_DXVA2]  = "dxva2",
     [AV_HWDEVICE_TYPE_D3D11VA] = "d3d11va",
+    [AV_HWDEVICE_TYPE_OPENCL] = "opencl",
     [AV_HWDEVICE_TYPE_QSV]    = "qsv",
     [AV_HWDEVICE_TYPE_VAAPI]  = "vaapi",
     [AV_HWDEVICE_TYPE_VDPAU]  = "vdpau",
@@ -213,19 +217,16 @@ static void hwframe_ctx_free(void *opaque, uint8_t *data)
 {
     AVHWFramesContext *ctx = (AVHWFramesContext*)data;
 
-    if (ctx->internal->source_frames) {
-        av_buffer_unref(&ctx->internal->source_frames);
+    if (ctx->internal->pool_internal)
+        av_buffer_pool_uninit(&ctx->internal->pool_internal);
 
-    } else {
-        if (ctx->internal->pool_internal)
-            av_buffer_pool_uninit(&ctx->internal->pool_internal);
+    if (ctx->internal->hw_type->frames_uninit)
+        ctx->internal->hw_type->frames_uninit(ctx);
 
-        if (ctx->internal->hw_type->frames_uninit)
-            ctx->internal->hw_type->frames_uninit(ctx);
+    if (ctx->free)
+        ctx->free(ctx);
 
-        if (ctx->free)
-            ctx->free(ctx);
-    }
+    av_buffer_unref(&ctx->internal->source_frames);
 
     av_buffer_unref(&ctx->device_ref);
 

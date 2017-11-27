@@ -1144,13 +1144,14 @@ The filter accepts the following options:
 
 @table @option
 @item loop
-Set the number of loops.
+Set the number of loops. Setting this value to -1 will result in infinite loops.
+Default is 0.
 
 @item size
-Set maximal number of samples.
+Set maximal number of samples. Default is 0.
 
 @item start
-Set first sample of loop.
+Set first sample of loop. Default is 0.
 @end table
 
 @anchor{amerge}
@@ -3277,6 +3278,65 @@ Specify which channels to filter, by default all available are filtered.
 Lowpass only LFE channel, it LFE is not present it does nothing:
 @example
 lowpass=c=LFE
+@end example
+@end itemize
+
+@section lv2
+
+Load a LV2 (LADSPA Version 2) plugin.
+
+To enable compilation of this filter you need to configure FFmpeg with
+@code{--enable-lv2}.
+
+@table @option
+@item plugin, p
+Specifies the plugin URI. You may need to escape ':'.
+
+@item controls, c
+Set the '|' separated list of controls which are zero or more floating point
+values that determine the behavior of the loaded plugin (for example delay,
+threshold or gain).
+If @option{controls} is set to @code{help}, all available controls and
+their valid ranges are printed.
+
+@item sample_rate, s
+Specify the sample rate, default to 44100. Only used if plugin have
+zero inputs.
+
+@item nb_samples, n
+Set the number of samples per channel per each output frame, default
+is 1024. Only used if plugin have zero inputs.
+
+@item duration, d
+Set the minimum duration of the sourced audio. See
+@ref{time duration syntax,,the Time duration section in the ffmpeg-utils(1) manual,ffmpeg-utils}
+for the accepted syntax.
+Note that the resulting duration may be greater than the specified duration,
+as the generated audio is always cut at the end of a complete frame.
+If not specified, or the expressed duration is negative, the audio is
+supposed to be generated forever.
+Only used if plugin have zero inputs.
+@end table
+
+@subsection Examples
+
+@itemize
+@item
+Apply bass enhancer plugin from Calf:
+@example
+lv2=p=http\\\\://calf.sourceforge.net/plugins/BassEnhancer:c=amount=2
+@end example
+
+@item
+Apply bass vinyl plugin from Calf:
+@example
+lv2=p=http\\\\://calf.sourceforge.net/plugins/Vinyl:c=drone=0.2|aging=0.5
+@end example
+
+@item
+Apply bit crusher plugin from ArtyFX:
+@example
+lv2=p=http\\\\://www.openavproductions.com/artyfx#bitta:c=crush=0.3
 @end example
 @end itemize
 
@@ -6913,10 +6973,6 @@ Default value is @samp{exhaustive}.
 If set then a detailed log of the motion search is written to the
 specified file.
 
-@item opencl
-If set to 1, specify using OpenCL capabilities, only available if
-FFmpeg was configured with @code{--enable-opencl}. Default value is 0.
-
 @end table
 
 @section despill
@@ -9995,13 +10051,14 @@ The filter accepts the following options:
 
 @table @option
 @item loop
-Set the number of loops.
+Set the number of loops. Setting this value to -1 will result in infinite loops.
+Default is 0.
 
 @item size
-Set maximal size in number of frames.
+Set maximal size in number of frames. Default is 0.
 
 @item start
-Set first frame of loop.
+Set first frame of loop. Default is 0.
 @end table
 
 @anchor{lut3d}
@@ -10571,6 +10628,34 @@ Default method is @samp{fdiff}.
 Scene change detection threshold. Default is @code{5.0}.
 @end table
 
+@section mix
+
+Mix several video input streams into one video stream.
+
+A description of the accepted options follows.
+
+@table @option
+@item nb_inputs
+The number of inputs. If unspecified, it defaults to 2.
+
+@item weights
+Specify weight of each input video stream as sequence.
+Each weight is separated by space.
+
+@item duration
+Specify how end of stream is determined.
+@table @samp
+@item longest
+The duration of the longest input. (default)
+
+@item shortest
+The duration of the shortest input.
+
+@item first
+The duration of the first input.
+@end table
+@end table
+
 @section mpdecimate
 
 Drop frames that do not differ greatly from the previous frame in
@@ -10839,6 +10924,86 @@ uniform noise (gaussian otherwise)
 Add temporal and uniform noise to input video:
 @example
 noise=alls=20:allf=t+u
+@end example
+
+@section normalize
+
+Normalize RGB video (aka histogram stretching, contrast stretching).
+See: https://en.wikipedia.org/wiki/Normalization_(image_processing)
+
+For each channel of each frame, the filter computes the input range and maps
+it linearly to the user-specified output range. The output range defaults
+to the full dynamic range from pure black to pure white.
+
+Temporal smoothing can be used on the input range to reduce flickering (rapid
+changes in brightness) caused when small dark or bright objects enter or leave
+the scene. This is similar to the auto-exposure (automatic gain control) on a
+video camera, and, like a video camera, it may cause a period of over- or
+under-exposure of the video.
+
+The R,G,B channels can be normalized independently, which may cause some
+color shifting, or linked together as a single channel, which prevents
+color shifting. Linked normalization preserves hue. Independent normalization
+does not, so it can be used to remove some color casts. Independent and linked
+normalization can be combined in any ratio.
+
+The normalize filter accepts the following options:
+
+@table @option
+@item blackpt
+@item whitept
+Colors which define the output range. The minimum input value is mapped to
+the @var{blackpt}. The maximum input value is mapped to the @var{whitept}.
+The defaults are black and white respectively. Specifying white for
+@var{blackpt} and black for @var{whitept} will give color-inverted,
+normalized video. Shades of grey can be used to reduce the dynamic range
+(contrast). Specifying saturated colors here can create some interesting
+effects.
+
+@item smoothing
+The number of previous frames to use for temporal smoothing. The input range
+of each channel is smoothed using a rolling average over the current frame
+and the @var{smoothing} previous frames. The default is 0 (no temporal
+smoothing).
+
+@item independence
+Controls the ratio of independent (color shifting) channel normalization to
+linked (color preserving) normalization. 0.0 is fully linked, 1.0 is fully
+independent. Defaults to 1.0 (fully independent).
+
+@item strength
+Overall strength of the filter. 1.0 is full strength. 0.0 is a rather
+expensive no-op. Defaults to 1.0 (full strength).
+
+@end table
+
+@subsection Examples
+
+Stretch video contrast to use the full dynamic range, with no temporal
+smoothing; may flicker depending on the source content:
+@example
+normalize=blackpt=black:whitept=white:smoothing=0
+@end example
+
+As above, but with 50 frames of temporal smoothing; flicker should be
+reduced, depending on the source content:
+@example
+normalize=blackpt=black:whitept=white:smoothing=50
+@end example
+
+As above, but with hue-preserving linked channel normalization:
+@example
+normalize=blackpt=black:whitept=white:smoothing=50:independence=0
+@end example
+
+As above, but with half strength:
+@example
+normalize=blackpt=black:whitept=white:smoothing=50:independence=0:strength=0.5
+@end example
+
+Map the darkest input color to red, the brightest input color to cyan:
+@example
+normalize=blackpt=red:whitept=cyan
 @end example
 
 @section null
@@ -15048,10 +15213,6 @@ sharpen it, a value of zero will disable the effect.
 
 Default value is 0.0.
 
-@item opencl
-If set to 1, specify using OpenCL capabilities, only available if
-FFmpeg was configured with @code{--enable-opencl}. Default value is 0.
-
 @end table
 
 All parameters are optional and default to the equivalent of the
@@ -17230,6 +17391,26 @@ Cubic root.
 
 @item log
 Logarithmic.
+@end table
+
+@item swap
+Swap left channel axis with right channel axis.
+
+@item mirror
+Mirror axis.
+
+@table @samp
+@item none
+No mirror.
+
+@item x
+Mirror only x axis.
+
+@item y
+Mirror only y axis.
+
+@item xy
+Mirror both axis.
 @end table
 
 @end table

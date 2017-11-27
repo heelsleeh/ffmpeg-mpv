@@ -247,6 +247,8 @@ DASH-templated name to used for the initialization segment. Default is "init-str
 DASH-templated name to used for the media segments. Default is "chunk-stream$RepresentationID$-$Number%05d$.m4s"
 @item -utc_timing_url @var{utc_url}
 URL of the page that will return the UTC timestamp in ISO format. Example: "https://time.akamai.com/?iso"
+@item -http_user_agent @var{user_agent}
+Override User-Agent field in HTTP header. Applicable only for HTTP output.
 @item -adaptation_sets @var{adaptation_sets}
 Assign streams to AdaptationSets. Syntax is "id=x,streams=a,b,c id=y,streams=d,e" with x and y being the IDs
 of the adaptation sets and a,b,c,d and e are the indices of the mapped streams.
@@ -734,6 +736,10 @@ Do not append the @code{EXT-X-ENDLIST} tag at the end of the playlist.
 The file specified by @code{hls_key_info_file} will be checked periodically and
 detect updates to the encryption info. Be sure to replace this file atomically,
 including the file containing the AES encryption key.
+
+@item independent_segments
+Add the @code{#EXT-X-INDEPENDENT-SEGMENTS} to playlists that has video segments
+and when all the segments of that playlist are guaranteed to start with a Key frame.
 
 @item split_by_time
 Allow segments to start on frames other than keyframes. This improves

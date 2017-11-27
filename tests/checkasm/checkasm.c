@@ -117,6 +117,9 @@ static const struct {
         { "hevc_add_res", checkasm_check_hevc_add_res },
         { "hevc_idct", checkasm_check_hevc_idct },
     #endif
+    #if CONFIG_HUFFYUV_DECODER
+        { "huffyuvdsp", checkasm_check_huffyuvdsp },
+    #endif
     #if CONFIG_JPEG2000_DECODER
         { "jpeg2000dsp", checkasm_check_jpeg2000dsp },
     #endif
@@ -125,6 +128,9 @@ static const struct {
     #endif
     #if CONFIG_PIXBLOCKDSP
         { "pixblockdsp", checkasm_check_pixblockdsp },
+    #endif
+    #if CONFIG_UTVIDEO_DECODER
+        { "utvideodsp", checkasm_check_utvideodsp },
     #endif
     #if CONFIG_V210_ENCODER
         { "v210enc", checkasm_check_v210enc },
