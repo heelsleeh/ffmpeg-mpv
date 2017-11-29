@@ -702,7 +702,8 @@ static void add_input_streams(OptionsContext *o, AVFormatContext *ic)
         AVStream *st = ic->streams[i];
         AVCodecParameters *par = st->codecpar;
         InputStream *ist = av_mallocz(sizeof(*ist));
-        char *framerate = NULL, *hwaccel = NULL, *hwaccel_device = NULL;
+        char *framerate = NULL, *hwaccel_device = NULL;
+        const char *hwaccel = NULL;
         char *hwaccel_output_format = NULL;
         char *codec_tag = NULL;
         char *next;
@@ -2000,6 +2001,8 @@ static int read_ffserver_streams(OptionsContext *o, AVFormatContext *s, const ch
 {
     int i, err;
     AVFormatContext *ic = avformat_alloc_context();
+    if (!ic)
+        return AVERROR(ENOMEM);
 
     ic->interrupt_callback = int_cb;
     err = avformat_open_input(&ic, filename, NULL, NULL);
